@@ -1,20 +1,77 @@
 import csv
 import os
 
+import torch
+from torch import nn
 from nltk import word_tokenize
-from transformers import BertForTokenClassification, Trainer, TrainingArguments
+from torchcrf import CRF
+from transformers import BertForTokenClassification, Trainer, TrainingArguments, BertPreTrainedModel, BertModel
 from sklearn.metrics import f1_score, classification_report
+
+
+class BertCrfForTokenClassification(BertPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.fc = nn.Linear(config.hidden_size, config.num_labels)
+        self.crf = CRF(num_tags=config.num_labels, batch_first=True)
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+    ):
+        outputs = self.bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+
+        sequence_output = outputs[0]
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.fc(sequence_output)
+        seq_len = logits.shape[1]
+
+        crf_mask = attention_mask == 1
+        crf_out = self.crf.decode(logits, mask=crf_mask)
+        crf_out_padded = torch.FloatTensor([seq + [0] * (seq_len - len(seq)) for seq in crf_out])
+        outputs = (crf_out_padded,) + outputs[2:]  # add hidden states and attention if they are here
+        if labels is not None:
+            crf_loss = -self.crf(logits, tags=labels, mask=crf_mask)
+            outputs = (crf_loss,) + outputs
+
+        return outputs  # (loss), scores, (hidden_states), (attentions)
 
 
 class AspectModel(object):
 
-    def __init__(self, model_reference, tokenizer, device, num_labels=None, cache_dir=None):
-        model_args = {"pretrained_model_name_or_path": model_reference}
+    def __init__(self, model_reference, tokenizer, device, use_crf=False, hidden_dropout_prob=0.1, num_labels=None, cache_dir=None):
+        model_args = {
+            "pretrained_model_name_or_path": model_reference,
+            "hidden_dropout_prob": hidden_dropout_prob
+        }
         if num_labels is not None:
             model_args["num_labels"] = num_labels
         if cache_dir is not None:
             model_args["cache_dir"] = cache_dir
-        self.model = BertForTokenClassification.from_pretrained(**model_args)
+        self.model = BertCrfForTokenClassification(**model_args) if use_crf \
+            else BertForTokenClassification.from_pretrained(**model_args)
         self.tokenizer = tokenizer
         self.device = device
         self.trainer = None

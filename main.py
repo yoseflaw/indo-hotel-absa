@@ -5,7 +5,8 @@ from absa.dataset import ReviewDataset
 from absa.model import AspectModel
 
 if __name__ == "__main__":
-    tag_only = True
+    use_crf = False
+    tag_only = False
     DRIVE_ROOT = "."
     available_gpu = torch.cuda.is_available()
     if available_gpu:
@@ -18,24 +19,28 @@ if __name__ == "__main__":
     train_dataset = ReviewDataset(
         filepath=f"{DRIVE_ROOT}/input/train.tsv",
         tokenizer=tokenizer,
-        tag_only=tag_only
+        tag_only=tag_only,
+        aux_labels=use_crf
     )
     val_dataset = ReviewDataset(
         filepath=f"{DRIVE_ROOT}/input/val.tsv",
         tokenizer=tokenizer,
         tag_only=tag_only,
-        tag2idx=train_dataset.tag2idx
+        tag2idx=train_dataset.tag2idx,
+        aux_labels=use_crf
     )
     test_dataset = ReviewDataset(
         filepath=f"{DRIVE_ROOT}/input/test.tsv",
         tokenizer=tokenizer,
         tag_only=tag_only,
-        tag2idx=train_dataset.tag2idx
+        tag2idx=train_dataset.tag2idx,
+        aux_labels=use_crf
     )
     aspect_model = AspectModel(
         model_reference=model_name,
         tokenizer=tokenizer,
         device=use_device,
+        use_crf=False,
         num_labels=train_dataset.num_labels,
         cache_dir=f"{DRIVE_ROOT}/pt_model/"
     )
