@@ -6,8 +6,8 @@ from torch.utils.data import Dataset
 
 
 class ReviewDataset(Dataset):
-    def __init__(self, filepath, tokenizer, tag2idx=None):
-        self.texts, self.tags = ReviewDataset.read_input(filepath)
+    def __init__(self, filepath, tokenizer, tag_only, tag2idx=None):
+        self.texts, self.tags = ReviewDataset.read_input(filepath, tag_only)
         self.encodings = tokenizer(
             self.texts,
             is_pretokenized=True,
@@ -34,7 +34,7 @@ class ReviewDataset(Dataset):
         return len(self.labels)
 
     @staticmethod
-    def read_input(filepath, tag_only=False):
+    def read_input(filepath, tag_only):
         path = Path(filepath)
         raw_text = path.read_text().strip()
         raw_docs = re.split(r"\n\n", raw_text)

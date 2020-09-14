@@ -5,6 +5,7 @@ from absa.dataset import ReviewDataset
 from absa.model import AspectModel
 
 if __name__ == "__main__":
+    tag_only = True
     DRIVE_ROOT = "."
     available_gpu = torch.cuda.is_available()
     if available_gpu:
@@ -14,9 +15,23 @@ if __name__ == "__main__":
         use_device = torch.device("cpu")
     model_name = "bert-base-multilingual-uncased"
     tokenizer = BertTokenizerFast.from_pretrained(model_name, cache_dir=f"{DRIVE_ROOT}/pt_model/")
-    train_dataset = ReviewDataset(f"{DRIVE_ROOT}/input/train.tsv", tokenizer)
-    val_dataset = ReviewDataset(f"{DRIVE_ROOT}/input/val.tsv", tokenizer, tag2idx=train_dataset.tag2idx)
-    test_dataset = ReviewDataset(f"{DRIVE_ROOT}/input/test.tsv", tokenizer, tag2idx=train_dataset.tag2idx)
+    train_dataset = ReviewDataset(
+        filepath=f"{DRIVE_ROOT}/input/train.tsv",
+        tokenizer=tokenizer,
+        tag_only=tag_only
+    )
+    val_dataset = ReviewDataset(
+        filepath=f"{DRIVE_ROOT}/input/val.tsv",
+        tokenizer=tokenizer,
+        tag_only=tag_only,
+        tag2idx=train_dataset.tag2idx
+    )
+    test_dataset = ReviewDataset(
+        filepath=f"{DRIVE_ROOT}/input/test.tsv",
+        tokenizer=tokenizer,
+        tag_only=tag_only,
+        tag2idx=train_dataset.tag2idx
+    )
     aspect_model = AspectModel(
         model_reference=model_name,
         tokenizer=tokenizer,
